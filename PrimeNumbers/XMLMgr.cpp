@@ -35,6 +35,7 @@ XML_Tree_Node::XML_Tree_Node()
 	_tagName = "";
 	_value = "";
 	_top = nullptr;
+	_it = _nodes.begin();
 }
 
 XML_Tree_Node::XML_Tree_Node(XML_Tree_Node* topNode, std::string Name, std::string Value) :
@@ -42,6 +43,7 @@ XML_Tree_Node::XML_Tree_Node(XML_Tree_Node* topNode, std::string Name, std::stri
 	_value(Value),
 	_top(topNode)
 {
+	_it = _nodes.begin();
 }
 
 XML_Tree_Node::XML_Tree_Node(const XML_Tree_Node& copy)
@@ -50,6 +52,7 @@ XML_Tree_Node::XML_Tree_Node(const XML_Tree_Node& copy)
 	_value = copy._value;
 	_top = copy._top;
 	_nodes = copy._nodes;
+	_it = _nodes.begin();
 }
 
 XML_Tree_Node& XML_Tree_Node::operator=(const XML_Tree_Node& copy)
@@ -58,6 +61,7 @@ XML_Tree_Node& XML_Tree_Node::operator=(const XML_Tree_Node& copy)
 	_value = copy._value;
 	_top = copy._top;
 	_nodes = copy._nodes;
+	_it = _nodes.begin();
 	return *this;
 }
 
@@ -83,6 +87,15 @@ void XML_Tree_Node::SetContent(std::string content)
 	_value = content;
 }
 
+void XML_Tree_Node::_UpdateTopNodes()
+{
+	for (size_t i = 0; i < _nodes.size(); i++)
+	{
+		for (size_t j = 0; j < _nodes[i]._nodes.size(); j++)
+			_nodes[i]._nodes[j]._top = &_nodes[i];
+	}
+}
+
 bool XML_Tree_Node::Destroy()
 {
 	if (!_top)
@@ -93,6 +106,8 @@ bool XML_Tree_Node::Destroy()
 		if (&(*it) == this)
 		{
 			_top->_nodes.erase(it);
+			_top->_it = _top->_nodes.begin();
+			_top->_UpdateTopNodes();
 			break;
 		}
 	}
@@ -111,12 +126,16 @@ XML_Tree_Node* XML_Tree_Node::GetLastNode()
 XML_Tree_Node* XML_Tree_Node::InsertEmptyNode()
 {
 	_nodes.push_back(XML_Tree_Node(this, "", ""));
+	_it = _nodes.begin();
+	_UpdateTopNodes();
 	return GetLastNode();
 }
 
 void XML_Tree_Node::RemoveNode(size_t i)
 {
 	_nodes.erase(_nodes.begin() + i);
+	_it = _nodes.begin();
+	_UpdateTopNodes();
 }
 
 void XML_Tree_Node::RemoveNode(std::string tagName, size_t skipMatches)
@@ -129,6 +148,8 @@ void XML_Tree_Node::RemoveNode(std::string tagName, size_t skipMatches)
 			if (matches == skipMatches)
 			{
 				_nodes.erase(it);
+				_it = _nodes.begin();
+				_UpdateTopNodes();
 				break;
 			}
 			matches++;
@@ -169,45 +190,82 @@ XML_Tree_Node* XML_Tree_Node::GetNodeByPath(std::string path)
 	return nullptr;
 }
 
+XML_Tree_Node* XML_Tree_Node::IterateNodes(bool reset)
+{
+	if (reset)
+		_it = _nodes.begin();
+
+	if (_nodes.size() == 0)
+		return nullptr;
+
+	if (_it == _nodes.end())
+		return nullptr;
+
+	XML_Tree_Node* node = &(*_it);
+	_it++;
+	return node;
+}
+
+XML_Tree_Node* XML_Tree_Node::LastIteratedNode()
+{
+	if (_nodes.size() == 0)
+		return nullptr;
+	if (_it == _nodes.end())
+		return GetLastNode();
+	return &(*_it);
+}
 
 std::string XML_Tree_Node::BuildXMLOutput()
 {
-	XML_Tree_Node* node = this;
-	std::string output;
-	size_t j = 0, depth = 0;
-	bool begin = true;
+	if (GetNodeCount() == 0)
+		return "";
+
+	XML_Tree_Node* tmpNode, *node = this;
+	std::string xml;
+	size_t depth = 0;
+	bool first = false;
+
 	while (true)
 	{
-		if (begin)
-			begin = false;
-		else
+		if (node->GetTopNode() == nullptr && (node->GetNodeCount() == 1 && first || (node->GetNodeCount() > 1 && node->LastIteratedNode() == node->GetLastNode())))
+			break;
+
+		if(!first)
+			first = true;
+
+
+		if (node->GetNodeCount() > 0)	//If we can go deeper
 		{
-			for (size_t i = 0; i < depth; i++)
-				output += "\t";
-			output += formTag(node->GetTagName(), false);
-		}
-		if (node->GetNodeCount() > 0)
-		{
-			output += "\r\n";
-			depth++;
-			node = node->GetNode(j);
-			continue;
-		}
-		else
-		{
-			output += node->GetContent();
-			output += formTag(node->GetTagName(), true) + "\r\n";
-			j++;
-			if (j == node->GetNodeCount())
+			tmpNode = node->IterateNodes();
+			if (!tmpNode)
 			{
-				node = node->GetTopNode()->GetTopNode();
-				j = 0;
+				depth--;
+				for (size_t i = 0; i < depth; i++)
+					xml += "\t";
+				xml += formTag(node->GetTagName(), true) + "\r\n";
+				node = node->GetTopNode();
+				continue;
 			}
 			else
-				node = node->GetTopNode();
-
+			{
+				for (size_t i = 0; i < depth; i++)
+					xml += "\t";
+				node = tmpNode;
+				xml += formTag(node->GetTagName(), false);
+				if (node->GetNodeCount() > 0)
+					xml += "\r\n";
+				depth++;
+			}
+		}
+		else //If it's finish of branch
+		{
+			xml += node->GetContent();
+			xml += formTag(node->GetTagName(), true) + "\r\n";
+			node = node->GetTopNode();
+			depth--;
 		}
 	}
+	return xml;
 }
 
 XML_Tree_Node* XML_Tree_Node::operator[](size_t i)

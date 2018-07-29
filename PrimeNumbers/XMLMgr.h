@@ -11,6 +11,9 @@ private:
 	std::string _value;
 	XML_Tree_Node* _top;
 	std::vector<XML_Tree_Node> _nodes;
+	std::vector<XML_Tree_Node>::iterator _it;
+
+	void _UpdateTopNodes();
 
 public:
 
@@ -38,6 +41,8 @@ public:
 	XML_Tree_Node* GetNode(size_t i);
 	XML_Tree_Node* GetNode(std::string tagName, size_t skipMatches = 0);
 	XML_Tree_Node* GetNodeByPath(std::string path);
+	XML_Tree_Node* IterateNodes(bool reset = false);
+	XML_Tree_Node* LastIteratedNode();
 
 	XML_Tree_Node* operator[](size_t i);
 	XML_Tree_Node* operator[](std::string tagName);
