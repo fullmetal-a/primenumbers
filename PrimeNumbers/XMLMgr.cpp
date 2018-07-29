@@ -30,7 +30,7 @@ bool CheckTagName(std::string tagName)
 		return true;
 }
 
-XML_Tree_Node::XML_Tree_Node()
+CXMLMgr::XML_Tree_Node::XML_Tree_Node()
 {
 	_tagName = "";
 	_value = "";
@@ -38,7 +38,7 @@ XML_Tree_Node::XML_Tree_Node()
 	_it = _nodes.begin();
 }
 
-XML_Tree_Node::XML_Tree_Node(XML_Tree_Node* topNode, std::string Name, std::string Value) :
+CXMLMgr::XML_Tree_Node::XML_Tree_Node(CXMLMgr::XML_Tree_Node* topNode, std::string Name, std::string Value) :
 	_tagName(Name),
 	_value(Value),
 	_top(topNode)
@@ -46,7 +46,7 @@ XML_Tree_Node::XML_Tree_Node(XML_Tree_Node* topNode, std::string Name, std::stri
 	_it = _nodes.begin();
 }
 
-XML_Tree_Node::XML_Tree_Node(const XML_Tree_Node& copy)
+CXMLMgr::XML_Tree_Node::XML_Tree_Node(const CXMLMgr::XML_Tree_Node& copy)
 {
 	_tagName = copy._tagName;
 	_value = copy._value;
@@ -55,7 +55,7 @@ XML_Tree_Node::XML_Tree_Node(const XML_Tree_Node& copy)
 	_it = _nodes.begin();
 }
 
-XML_Tree_Node& XML_Tree_Node::operator=(const XML_Tree_Node& copy)
+CXMLMgr::XML_Tree_Node& CXMLMgr::XML_Tree_Node::operator=(const CXMLMgr::XML_Tree_Node& copy)
 {
 	_tagName = copy._tagName;
 	_value = copy._value;
@@ -65,38 +65,41 @@ XML_Tree_Node& XML_Tree_Node::operator=(const XML_Tree_Node& copy)
 	return *this;
 }
 
-std::string XML_Tree_Node::GetTagName() const
+std::string CXMLMgr::XML_Tree_Node::GetTagName() const
 {
 	return _tagName;
 }
 
-std::string XML_Tree_Node::GetContent() const
+std::string CXMLMgr::XML_Tree_Node::GetContent() const
 {
 	return _value;
 }
 
-void XML_Tree_Node::SetTagName(std::string tagName)
+void CXMLMgr::XML_Tree_Node::SetTagName(std::string tagName)
 {
 	if(!CheckTagName(tagName))
 		throw std::runtime_error("XML Parsing error: Bad tag name.");
 	_tagName = tagName;
 }
 
-void XML_Tree_Node::SetContent(std::string content)
+void CXMLMgr::XML_Tree_Node::SetContent(std::string content)
 {
 	_value = content;
 }
 
-void XML_Tree_Node::_UpdateTopNodes()
+void CXMLMgr::XML_Tree_Node::_UpdateTopNodes()
 {
 	for (size_t i = 0; i < _nodes.size(); i++)
 	{
 		for (size_t j = 0; j < _nodes[i]._nodes.size(); j++)
+		{
+			_nodes[i]._UpdateTopNodes();
 			_nodes[i]._nodes[j]._top = &_nodes[i];
+		}
 	}
 }
 
-bool XML_Tree_Node::Destroy()
+bool CXMLMgr::XML_Tree_Node::Destroy()
 {
 	if (!_top)
 		return false;
@@ -114,7 +117,7 @@ bool XML_Tree_Node::Destroy()
 	return true;
 }
 
-XML_Tree_Node* XML_Tree_Node::GetLastNode()
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetLastNode()
 {
 	size_t size = _nodes.size();
 	if (size == 0)
@@ -123,22 +126,22 @@ XML_Tree_Node* XML_Tree_Node::GetLastNode()
 		return &_nodes[size-1];
 }
 
-XML_Tree_Node* XML_Tree_Node::InsertEmptyNode()
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::InsertEmptyNode()
 {
-	_nodes.push_back(XML_Tree_Node(this, "", ""));
+	_nodes.push_back(CXMLMgr::XML_Tree_Node(this, "", ""));
 	_it = _nodes.begin();
 	_UpdateTopNodes();
 	return GetLastNode();
 }
 
-void XML_Tree_Node::RemoveNode(size_t i)
+void CXMLMgr::XML_Tree_Node::RemoveNode(size_t i)
 {
 	_nodes.erase(_nodes.begin() + i);
 	_it = _nodes.begin();
 	_UpdateTopNodes();
 }
 
-void XML_Tree_Node::RemoveNode(std::string tagName, size_t skipMatches)
+void CXMLMgr::XML_Tree_Node::RemoveNode(std::string tagName, size_t skipMatches)
 {
 	size_t matches = 0;
 	for (auto it = _nodes.begin(); it != _nodes.end(); it++)
@@ -157,17 +160,17 @@ void XML_Tree_Node::RemoveNode(std::string tagName, size_t skipMatches)
 	}
 }
 
-XML_Tree_Node* XML_Tree_Node::GetTopNode()
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetTopNode()
 {
 	return _top;
 }
 
-XML_Tree_Node* XML_Tree_Node::GetNode(size_t i)
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNode(size_t i)
 {
 	return &_nodes[i];
 }
 
-XML_Tree_Node* XML_Tree_Node::GetNode(std::string tagName, size_t skipMatches)
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNode(std::string tagName, size_t skipMatches)
 {
 	size_t matches = 0;
 	for (auto it = _nodes.begin(); it != _nodes.end(); it++)
@@ -185,12 +188,7 @@ XML_Tree_Node* XML_Tree_Node::GetNode(std::string tagName, size_t skipMatches)
 	return nullptr;
 }
 
-XML_Tree_Node* XML_Tree_Node::GetNodeByPath(std::string path)
-{
-	return nullptr;
-}
-
-XML_Tree_Node* XML_Tree_Node::IterateNodes(bool reset)
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::IterateNodes(bool reset)
 {
 	if (reset)
 		_it = _nodes.begin();
@@ -201,38 +199,42 @@ XML_Tree_Node* XML_Tree_Node::IterateNodes(bool reset)
 	if (_it == _nodes.end())
 		return nullptr;
 
-	XML_Tree_Node* node = &(*_it);
+	CXMLMgr::XML_Tree_Node* node = &(*_it);
 	_it++;
 	return node;
 }
 
-XML_Tree_Node* XML_Tree_Node::LastIteratedNode()
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::LastIteratedNode()
 {
 	if (_nodes.size() == 0)
 		return nullptr;
-	if (_it == _nodes.end())
+	else if (_it == _nodes.end())
 		return GetLastNode();
-	return &(*_it);
+	else if (_it == _nodes.begin())
+		return &(*_it);
+	else
+		return &(*(_it - 1));
 }
 
-std::string XML_Tree_Node::BuildXMLOutput()
+std::string CXMLMgr::XML_Tree_Node::BuildXMLOutput()
 {
 	if (GetNodeCount() == 0)
 		return "";
 
-	XML_Tree_Node* tmpNode, *node = this;
+	CXMLMgr::XML_Tree_Node* tmpNode, *node = this;
 	std::string xml;
 	size_t depth = 0;
 	bool first = false;
 
 	while (true)
 	{
+		auto a = node->LastIteratedNode();
+		auto b = node->GetLastNode();
 		if (node->GetTopNode() == nullptr && (node->GetNodeCount() == 1 && first || (node->GetNodeCount() > 1 && node->LastIteratedNode() == node->GetLastNode())))
 			break;
 
 		if(!first)
 			first = true;
-
 
 		if (node->GetNodeCount() > 0)	//If we can go deeper
 		{
@@ -268,17 +270,17 @@ std::string XML_Tree_Node::BuildXMLOutput()
 	return xml;
 }
 
-XML_Tree_Node* XML_Tree_Node::operator[](size_t i)
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::operator[](size_t i)
 {
 	return GetNode(i);
 }
 
-XML_Tree_Node* XML_Tree_Node::operator[](std::string tagName)
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::operator[](std::string tagName)
 {
 	return GetNode(tagName);
 }
 
-size_t XML_Tree_Node::GetNodeCount() const
+size_t CXMLMgr::XML_Tree_Node::GetNodeCount() const
 {
 	return _nodes.size();
 }
@@ -320,7 +322,7 @@ void CXMLMgr::ParseFile()
 	size_t dest = 0, offset = 0, tempOffset = 0, contentLength = 0;
 	size_t fileLen = fileContent.length();
 	bool closingTag = false;
-	XML_Tree_Node* node = &m_TreeRoot; 
+	CXMLMgr::XML_Tree_Node* node = &m_TreeRoot; 
 
 	while(true)
 	{
@@ -393,32 +395,33 @@ void CXMLMgr::ParseFile()
 			offset = dest;
 		}
 	}
-
-	std::cout << m_TreeRoot.BuildXMLOutput() << std::endl;
-	
 }
 
 void CXMLMgr::LoadFrom(std::string fileName)
 {
-
+	m_fileName = fileName;
+	ParseFile();
 }
 
 void CXMLMgr::Reload()
 {
-
+	ParseFile();
 }
 
 void CXMLMgr::Save()
 {
-
+	std::ofstream f(m_fileName);
+	f << m_TreeRoot.BuildXMLOutput();
+	f.close();
 }
 
 void CXMLMgr::SaveTo(std::string fileName)
 {
-
+	m_fileName = fileName;
+	Save();
 }
 
-std::string CXMLMgr::GetContent(std::string tagSequence, size_t n) const
+CXMLMgr::XML_Tree_Node* CXMLMgr::GetRootNode()
 {
-	return "";
+	return &m_TreeRoot;
 }
