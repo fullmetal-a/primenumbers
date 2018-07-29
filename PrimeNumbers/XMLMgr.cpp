@@ -6,7 +6,29 @@
 #include <iostream>
 #include <stack>
 #include <vector>
-#include <list>
+
+
+std::string formTag(std::string tagName, bool isClosing)
+{
+	std::string retval = "<";
+	if (isClosing)
+		retval += "/";
+	retval += tagName + ">";
+	return retval;
+}
+
+bool CheckTagName(std::string tagName)
+{
+	std::regex tagName_re("^[A-Za-z0-9_-]+$");
+
+	if (tagName.length() == 0)
+		return false;
+
+	if (!std::regex_match(tagName, tagName_re))
+		return false;
+	else
+		return true;
+}
 
 XML_Tree_Node::XML_Tree_Node()
 {
@@ -51,6 +73,8 @@ std::string XML_Tree_Node::GetContent() const
 
 void XML_Tree_Node::SetTagName(std::string tagName)
 {
+	if(!CheckTagName(tagName))
+		throw std::runtime_error("XML Parsing error: Bad tag name.");
 	_tagName = tagName;
 }
 
@@ -75,10 +99,19 @@ bool XML_Tree_Node::Destroy()
 	return true;
 }
 
-XML_Tree_Node* XML_Tree_Node::InsertNode(std::string tagName, std::string Content)
+XML_Tree_Node* XML_Tree_Node::GetLastNode()
 {
-	_nodes.push_back(XML_Tree_Node(this, tagName, Content));
-	return &_nodes[_nodes.size() - 1];
+	size_t size = _nodes.size();
+	if (size == 0)
+		return nullptr;
+	else
+		return &_nodes[size-1];
+}
+
+XML_Tree_Node* XML_Tree_Node::InsertEmptyNode()
+{
+	_nodes.push_back(XML_Tree_Node(this, "", ""));
+	return GetLastNode();
 }
 
 void XML_Tree_Node::RemoveNode(size_t i)
@@ -136,9 +169,60 @@ XML_Tree_Node* XML_Tree_Node::GetNodeByPath(std::string path)
 	return nullptr;
 }
 
-std::string XML_Tree_Node::BuildXMLOutput() const
+
+std::string XML_Tree_Node::BuildXMLOutput()
 {
-	return "";
+	XML_Tree_Node* node = this;
+	std::string output;
+	size_t j = 0, depth = 0;
+	bool begin = true;
+	while (true)
+	{
+		if (begin)
+			begin = false;
+		else
+		{
+			for (size_t i = 0; i < depth; i++)
+				output += "\t";
+			output += formTag(node->GetTagName(), false);
+		}
+		if (node->GetNodeCount() > 0)
+		{
+			output += "\r\n";
+			depth++;
+			node = node->GetNode(j);
+			continue;
+		}
+		else
+		{
+			output += node->GetContent();
+			output += formTag(node->GetTagName(), true) + "\r\n";
+			j++;
+			if (j == node->GetNodeCount())
+			{
+				node = node->GetTopNode()->GetTopNode();
+				j = 0;
+			}
+			else
+				node = node->GetTopNode();
+
+		}
+	}
+}
+
+XML_Tree_Node* XML_Tree_Node::operator[](size_t i)
+{
+	return GetNode(i);
+}
+
+XML_Tree_Node* XML_Tree_Node::operator[](std::string tagName)
+{
+	return GetNode(tagName);
+}
+
+size_t XML_Tree_Node::GetNodeCount() const
+{
+	return _nodes.size();
 }
 
 CXMLMgr::CXMLMgr() :
@@ -156,19 +240,6 @@ CXMLMgr::CXMLMgr(std::string fileName) :
 
 CXMLMgr::~CXMLMgr()
 {
-}
-
-bool CXMLMgr::CheckTagName(std::string tagName) const
-{
-	std::regex tagName_re("^[A-Za-z0-9_-]+$");
-
-	if (tagName.length() == 0)
-		return false;
-
-	if (!std::regex_match(tagName, tagName_re))
-		return false;
-	else
-		return true;
 }
 
 void CXMLMgr::ParseFile()
@@ -191,7 +262,7 @@ void CXMLMgr::ParseFile()
 	size_t dest = 0, offset = 0, tempOffset = 0, contentLength = 0;
 	size_t fileLen = fileContent.length();
 	bool closingTag = false;
-	XML_Tree_Node* node = &m_TreeRoot;
+	XML_Tree_Node* node = &m_TreeRoot; 
 
 	while(true)
 	{
@@ -241,7 +312,7 @@ void CXMLMgr::ParseFile()
 			{
 				if (tagName == openedTags.top().first)
 				{
-					contentLength = offset - openedTags.top().second;
+					contentLength = offset - openedTags.top().second - 1;
 					content = fileContent.substr(openedTags.top().second, contentLength);
 					node->SetTagName(tagName);
 					node->SetContent(content);
@@ -258,12 +329,14 @@ void CXMLMgr::ParseFile()
 			else
 			{
 				openedTags.push(std::pair<std::string, size_t>(tagName, dest + 1));
-				node = node->InsertNode("", "");
+				node = node->InsertEmptyNode();
 			}
 
 			offset = dest;
 		}
 	}
+
+	std::cout << m_TreeRoot.BuildXMLOutput() << std::endl;
 	
 }
 

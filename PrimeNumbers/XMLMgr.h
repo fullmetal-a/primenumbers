@@ -23,19 +23,24 @@ public:
 
 	std::string GetTagName() const;
 	std::string GetContent() const;
+	size_t GetNodeCount() const;
 
 	void SetTagName(std::string tagName);
 	void SetContent(std::string content);
 
-	std::string BuildXMLOutput() const;
-	XML_Tree_Node* InsertNode(std::string tagName, std::string Content);
+	std::string BuildXMLOutput();
+	XML_Tree_Node* InsertEmptyNode();
 	bool Destroy();
 	void RemoveNode(size_t i);
 	void RemoveNode(std::string tagName, size_t skipMatches = 0);
 	XML_Tree_Node* GetTopNode();
+	XML_Tree_Node* GetLastNode();
 	XML_Tree_Node* GetNode(size_t i);
 	XML_Tree_Node* GetNode(std::string tagName, size_t skipMatches = 0);
 	XML_Tree_Node* GetNodeByPath(std::string path);
+
+	XML_Tree_Node* operator[](size_t i);
+	XML_Tree_Node* operator[](std::string tagName);
 };
 
 class CXMLMgr
@@ -46,7 +51,6 @@ private:
 	XML_Tree_Node m_TreeRoot;
 
 	void ParseFile();
-	bool CheckTagName(std::string tagName) const;
 
 	CXMLMgr(const CXMLMgr& copy) = delete;
 	CXMLMgr& operator=(const CXMLMgr& node) = delete;
