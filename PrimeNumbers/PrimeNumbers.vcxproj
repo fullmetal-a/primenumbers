@@ -116,9 +116,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="PrimeNumbers.cpp" />
     <ClCompile Include="XMLMgr.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="PrimeNumbers.h" />
     <ClInclude Include="XMLMgr.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

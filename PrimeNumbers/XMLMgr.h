@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <sstream>
 
 class CXMLMgr
 {
@@ -28,21 +29,42 @@ public:
 		XML_Tree_Node & operator=(const XML_Tree_Node& copy);
 
 		std::string GetTagName() const;
-		std::string GetContent() const;
+		template<class T> T GetContent() const
+		{
+			std::stringstream ss;
+			T t;
+			ss << _value;
+			ss >> t;
+			return t;
+		}
 		size_t GetNodeCount() const;
 
 		void SetTagName(std::string tagName);
-		void SetContent(std::string content);
+		template<class T> void SetContent(T content)
+		{
+			std::stringstream ss;
+			ss << content;
+			_value = ss.str();
+		}
 
 		std::string BuildXMLOutput();
-		XML_Tree_Node* InsertEmptyNode();
+		template<class T = std::string> XML_Tree_Node* InsertNode(std::string tagName = "", T content = "")
+		{
+			std::stringstream ss;
+			ss << content;
+			_nodes.push_back(CXMLMgr::XML_Tree_Node(this, tagName, ss.str()));
+			_it = _nodes.begin();
+			_UpdateTopNodes();
+			return GetLastNode();
+		}
 		bool Destroy();
 		void RemoveNode(size_t i);
 		void RemoveNode(std::string tagName, size_t skipMatches = 0);
 		XML_Tree_Node* GetTopNode();
 		XML_Tree_Node* GetLastNode();
-		XML_Tree_Node* GetNode(size_t i);
-		XML_Tree_Node* GetNode(std::string tagName, size_t skipMatches = 0);
+		XML_Tree_Node* GetNodeByIndex(size_t i);
+		XML_Tree_Node* GetNode(std::string tagName, size_t skipMatches);
+		XML_Tree_Node* GetNode(std::string tagName, bool createIfNotExist = true);
 		XML_Tree_Node* IterateNodes(bool reset = false);
 		XML_Tree_Node* LastIteratedNode();
 

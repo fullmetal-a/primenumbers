@@ -24,6 +24,9 @@ bool CheckTagName(std::string tagName)
 	if (tagName.length() == 0)
 		return false;
 
+	if (tagName.length() > 1000)
+		return false;
+
 	if (!std::regex_match(tagName, tagName_re))
 		return false;
 	else
@@ -70,21 +73,11 @@ std::string CXMLMgr::XML_Tree_Node::GetTagName() const
 	return _tagName;
 }
 
-std::string CXMLMgr::XML_Tree_Node::GetContent() const
-{
-	return _value;
-}
-
 void CXMLMgr::XML_Tree_Node::SetTagName(std::string tagName)
 {
 	if(!CheckTagName(tagName))
 		throw std::runtime_error("XML Parsing error: Bad tag name.");
 	_tagName = tagName;
-}
-
-void CXMLMgr::XML_Tree_Node::SetContent(std::string content)
-{
-	_value = content;
 }
 
 void CXMLMgr::XML_Tree_Node::_UpdateTopNodes()
@@ -126,14 +119,6 @@ CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetLastNode()
 		return &_nodes[size-1];
 }
 
-CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::InsertEmptyNode()
-{
-	_nodes.push_back(CXMLMgr::XML_Tree_Node(this, "", ""));
-	_it = _nodes.begin();
-	_UpdateTopNodes();
-	return GetLastNode();
-}
-
 void CXMLMgr::XML_Tree_Node::RemoveNode(size_t i)
 {
 	_nodes.erase(_nodes.begin() + i);
@@ -165,7 +150,7 @@ CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetTopNode()
 	return _top;
 }
 
-CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNode(size_t i)
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNodeByIndex(size_t i)
 {
 	return &_nodes[i];
 }
@@ -185,7 +170,31 @@ CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNode(std::string tagName, siz
 			matches++;
 		}
 	}
-	return nullptr;
+
+	char errmsg[1200];
+	sprintf_s(errmsg, 1200, "XML GetNode error: Tag \"%s\"[%u] does not exist.", tagName.c_str(), skipMatches);
+	throw std::runtime_error(errmsg);
+}
+
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNode(std::string tagName, bool createIfNotExist)
+{
+	for (auto it = _nodes.begin(); it != _nodes.end(); it++)
+	{
+		if ((*it)._tagName == tagName)
+		{
+			return &(*it);
+			break;
+		}
+	}
+
+	if (createIfNotExist)
+		return InsertNode(tagName);
+	else
+	{
+		char errmsg[1200];
+		sprintf_s(errmsg, 1200, "XML GetNode error: Tag \"%s\" does not exist.", tagName.c_str());
+		throw std::runtime_error(errmsg);
+	}
 }
 
 CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::IterateNodes(bool reset)
@@ -261,7 +270,7 @@ std::string CXMLMgr::XML_Tree_Node::BuildXMLOutput()
 		}
 		else //If it's finish of branch
 		{
-			xml += node->GetContent();
+			xml += node->GetContent<std::string>();
 			xml += formTag(node->GetTagName(), true) + "\r\n";
 			node = node->GetTopNode();
 			depth--;
@@ -272,7 +281,7 @@ std::string CXMLMgr::XML_Tree_Node::BuildXMLOutput()
 
 CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::operator[](size_t i)
 {
-	return GetNode(i);
+	return GetNodeByIndex(i);
 }
 
 CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::operator[](std::string tagName)
@@ -304,8 +313,8 @@ CXMLMgr::~CXMLMgr()
 
 void CXMLMgr::ParseFile()
 {
-	if(_access(m_fileName.c_str(), 0) == -1)
-		throw std::runtime_error("Wrong file name. File does not exist.");
+	if (_access(m_fileName.c_str(), 0) == -1)
+		return;
 
 	std::ifstream f(m_fileName);
 	std::string fileContent;
@@ -351,15 +360,21 @@ void CXMLMgr::ParseFile()
 			dest = fileContent.find(">", offset);
 			if (dest == std::string::npos)
 			{
-				fileContent = ""; m_fileName = "";
+				m_fileName = "";
 				throw std::runtime_error("XML Parsing error: Endless tag found.");
 			}
 
 			tagName = fileContent.substr(offset + 1, dest - (offset + 1));
 			if (tagName.length() == 0)
 			{
-				fileContent = ""; m_fileName = "";
+				m_fileName = "";
 				throw std::runtime_error("XML Parsing error: Nameless tag found.");
+			}
+
+			if(tagName.length() > 1000)
+			{
+				m_fileName = "";
+				throw std::runtime_error("XML Parsing error: Too long tag name.");
 			}
 
 			if (!CheckTagName(tagName))
@@ -372,9 +387,8 @@ void CXMLMgr::ParseFile()
 			{
 				if (tagName == openedTags.top().first)
 				{
-					contentLength = offset - openedTags.top().second - 1;
+					contentLength = offset - openedTags.top().second;
 					content = fileContent.substr(openedTags.top().second, contentLength);
-					node->SetTagName(tagName);
 					node->SetContent(content);
 					node = node->GetTopNode();
 					openedTags.pop();
@@ -388,8 +402,8 @@ void CXMLMgr::ParseFile()
 			}
 			else
 			{
-				openedTags.push(std::pair<std::string, size_t>(tagName, dest + 1));
-				node = node->InsertEmptyNode();
+				openedTags.push(std::pair<std::string, size_t>(tagName, dest));
+				node = node->InsertNode(tagName);
 			}
 
 			offset = dest;
