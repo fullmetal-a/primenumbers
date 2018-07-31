@@ -267,7 +267,7 @@ CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNodeByIndex(size_t i)
 	return &_nodes[i];
 }
 
-CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNode(std::string tagName, size_t skipMatches)
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNodeSkipMatches(std::string tagName, size_t skipMatches)
 {
 	if (tagName.length() == 0)	//We are not able to search for a nameless tag
 		throw std::runtime_error("XML Error: Cannot search for nameless tag.");
@@ -361,7 +361,10 @@ std::string CXMLMgr::XML_Tree_Node::BuildXMLOutput()
 		//End if we are on root node now, we done first iteration and node count in root node is 1
 		//Or end of we are on root node now and last iterated node of root node is last node.
 		if (node->GetTopNode() == nullptr && (node->GetNodeCount() == 1 && first || (node->GetNodeCount() > 1 && node->LastIteratedNode() == node->GetLastNode())))
+		{
+			xml.pop_back(); //Remove last new line
 			break;
+		}
 
 		if(!first)	//We done first iteration
 			first = true;
@@ -456,37 +459,35 @@ void CXMLMgr::XML_Tree_Node::RemoveAllNodes()
 CXMLMgr::CXMLMgr() :
 m_fileName("")
 {
+
 }
 
 CXMLMgr::CXMLMgr(std::string fileName) :
 	m_fileName(fileName) //Save last used filename
 {
-	ParseFile();	//Parsing file
-}
-
-
-void CXMLMgr::ParseFile()
-{
 	if (_access(m_fileName.c_str(), 0) == -1)	//Return if file does not exist
 		return;
 
 	//Reading file
-	std::ifstream f(m_fileName);	
+	std::ifstream f(m_fileName);
 	std::string fileContent; //Buffer for file content
 	f.seekg(0, std::ios::end);
 	fileContent.reserve(size_t(f.tellg()));
 	f.seekg(0, std::ios::beg);
-
-	//Save entire file to string
 	fileContent.assign((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-	f.close(); //Closing file
+	f.close();
+	Parse(fileContent);
+}
 
-	size_t fileLen = fileContent.length(); //Length of file content
+
+void CXMLMgr::Parse(std::string& buffer)
+{
+	size_t fileLen = buffer.length(); //Length of file content
 
 	if (fileLen == 0) //Return if file is empty
 		return;
 
-	XML_Utils::RemoveComments(fileContent); //Remove all XML-styled comments from file buffer
+	XML_Utils::RemoveComments(buffer); //Remove all XML-styled comments from file buffer
 	std::string tagName, content; 
 	std::stack<std::pair<std::string, size_t>> openedTags; //Stack of opened tags on loop iterations
 	
@@ -499,8 +500,8 @@ void CXMLMgr::ParseFile()
 
 	while(true)
 	{
-		offset = fileContent.find("<", offset);	//Find '<' starting by offset
-		tempOffset = fileContent.find("</", offset);  //Find '</' starting by offset
+		offset = buffer.find("<", offset);	//Find '<' starting by offset
+		tempOffset = buffer.find("</", offset);  //Find '</' starting by offset
 
 		if (offset == std::string::npos && tempOffset == std::string::npos) //If no tags was found
 		{
@@ -509,7 +510,7 @@ void CXMLMgr::ParseFile()
 				//Throwing an exeption with an additional info (unclosed tag and line of it)
 				m_fileName = "";
 				char errmsg[1200];
-				size_t line = XML_Utils::CountLines(fileContent, openedTags.top().second);
+				size_t line = XML_Utils::CountLines(buffer, openedTags.top().second);
 				sprintf_s(errmsg, 1200, "XML Parsing error: Reached end of the file, but tag \"%s\"on line %u.", openedTags.top().first.c_str(), line);
 				throw std::runtime_error(errmsg);
 			}
@@ -525,24 +526,24 @@ void CXMLMgr::ParseFile()
 			else
 				closingTag = false; //Working with opening tags...
 
-			dest = fileContent.find(">", offset); //Find end of tag
+			dest = buffer.find(">", offset); //Find end of tag
 			if (dest == std::string::npos) //If tag does not have any end
 			{
 				//Throwing an exeption with an additional info (line of endless tag)
 				m_fileName = "";
 				char errmsg[128];
-				size_t line = XML_Utils::CountLines(fileContent, offset);
+				size_t line = XML_Utils::CountLines(buffer, offset);
 				sprintf_s(errmsg, 128, "XML Parsing error: Endless tag found on line %u.", line);
 				throw std::runtime_error(errmsg);
 			}
 
-			tagName = fileContent.substr(offset + 1, dest - (offset + 1)); //Save tag name
+			tagName = buffer.substr(offset + 1, dest - (offset + 1)); //Save tag name
 			if (tagName.length() == 0) //If tag is nameless
 			{
 				//Throwing an exeption with an additional info (line of nameless tag)
 				m_fileName = "";
 				char errmsg[128];
-				size_t line = XML_Utils::CountLines(fileContent, offset);
+				size_t line = XML_Utils::CountLines(buffer, offset);
 				sprintf_s(errmsg, 128, "XML Parsing error: Nameless tag found on line %u.", line);
 				throw std::runtime_error(errmsg);
 			}
@@ -552,7 +553,7 @@ void CXMLMgr::ParseFile()
 				//Throwing an exeption with an additional info (line of nameless tag)
 				m_fileName = "";
 				char errmsg[128];
-				size_t line = XML_Utils::CountLines(fileContent, offset);
+				size_t line = XML_Utils::CountLines(buffer, offset);
 				sprintf_s(errmsg, 128, "XML Parsing error: Too long tag name on line %u.", line);
 				throw std::runtime_error(errmsg);
 			}
@@ -562,7 +563,7 @@ void CXMLMgr::ParseFile()
 				//if not - throw an exeption with an additional info (name and line of tag)
 				m_fileName = "";
 				char errmsg[1200];
-				size_t line = XML_Utils::CountLines(fileContent, offset);
+				size_t line = XML_Utils::CountLines(buffer, offset);
 				sprintf_s(errmsg, 1200, "XML Parsing error: Bad tag name \"%s\" on line %u.", tagName.c_str(), line);
 				throw std::runtime_error(errmsg);
 			}
@@ -572,7 +573,7 @@ void CXMLMgr::ParseFile()
 				if (tagName == openedTags.top().first) //If closing tag matching last opened tag
 				{
 					contentLength = offset - openedTags.top().second - 1; //Calculate length of tag's content
-					content = fileContent.substr(openedTags.top().second, contentLength); //Write
+					content = buffer.substr(openedTags.top().second, contentLength); //Write
 					XML_Utils::TransformContent(content, true); //Make content pure
 					node->SetContent(content); //Save content to XML node
 					if (node->GetTopNode()) //If we have top node - set it's content to an empty
@@ -584,7 +585,7 @@ void CXMLMgr::ParseFile()
 				{
 					//Throwing an exeption with an additional info (line of closing tag, name of closing tag, name of expected tag)
 					m_fileName = ""; 
-					size_t line = XML_Utils::CountLines(fileContent, offset);
+					size_t line = XML_Utils::CountLines(buffer, offset);
 					throw std::runtime_error(std::string(std::string("XML Parsing error: Unexpected closing tag \"</") + tagName + ">\" on line " + std::to_string(line) +  ", expected: \"</" + openedTags.top().first + ">\"").c_str());
 				}
 			}
@@ -599,17 +600,45 @@ void CXMLMgr::ParseFile()
 	}
 }
 
-void CXMLMgr::LoadFrom(std::string fileName)
+void CXMLMgr::LoadFromFile(std::string fileName)
 {
 	m_TreeRoot.RemoveAllNodes(); //Clear our tree root
 	m_fileName = fileName; //Save last used filename
-	ParseFile(); //Parsing a file
+
+	if (_access(m_fileName.c_str(), 0) == -1)	//Return if file does not exist
+		return;
+
+	//Reading file
+	std::ifstream f(m_fileName);
+	std::string fileContent; //Buffer for file content
+	f.seekg(0, std::ios::end);
+	fileContent.reserve(size_t(f.tellg()));
+	f.seekg(0, std::ios::beg);
+	fileContent.assign((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+	f.close();
+	Parse(fileContent);
+}
+
+void CXMLMgr::LoadFromBuffer(std::string buffer)
+{
+	Parse(buffer);
 }
 
 void CXMLMgr::Reload()
 {
 	m_TreeRoot.RemoveAllNodes(); //Clear our tree root
-	ParseFile(); //Parse it again
+	if (_access(m_fileName.c_str(), 0) == -1)	//Return if file does not exist
+		return;
+
+	//Reading file
+	std::ifstream f(m_fileName);
+	std::string fileContent; //Buffer for file content
+	f.seekg(0, std::ios::end);
+	fileContent.reserve(size_t(f.tellg()));
+	f.seekg(0, std::ios::beg);
+	fileContent.assign((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+	f.close();
+	Parse(fileContent); //Parse it again
 }
 
 void CXMLMgr::Save()

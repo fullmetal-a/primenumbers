@@ -99,7 +99,7 @@ public:
 		XML_Tree_Node* GetTopNode();	//Returns pointer to the top node (Parent node)
 		XML_Tree_Node* GetLastNode();	//Returns pointer to the last child node
 		XML_Tree_Node* GetNodeByIndex(size_t i);	//Returns pointer to child node by index
-		XML_Tree_Node* GetNode(std::string tagName, size_t skipMatches); //Returns pointer to child node matched by name (can skip some occurrences)
+		XML_Tree_Node* GetNodeSkipMatches(std::string tagName, size_t skipMatches); //Returns pointer to child node matched by name (can skip some occurrences)
 		XML_Tree_Node* GetNode(std::string tagName, bool createIfNotExist = true);	//Get first matching node by name and create it if not exists (Or throw an exeption it not)
 		
 		//Iterates all child nodes. First call (or call with reset = true) will return first node. Every next call will return next node until it finaly will reach end.
@@ -120,8 +120,8 @@ private:
 	std::string m_fileName;	//Name of last used file
 	XML_Tree_Node m_TreeRoot;	//Root node of XML tree
 
-	//Parsed file (m_fileName) and generates XML tree of it. Throws runtime exeption if errors found (With information about error)
-	void ParseFile();	
+	//Parsed buffer and generates XML tree of it. Throws runtime exeption if errors found (With information about error)
+	void Parse(std::string& buffer);	
 
 	//No copy constructors allowed
 	CXMLMgr(const CXMLMgr& copy) = delete;	
@@ -135,7 +135,8 @@ public:
 
 	XML_Tree_Node* GetRootNode();	//Returns pointer to the root node
 
-	void LoadFrom(std::string fileName); //Load XML from specific file
+	void LoadFromFile(std::string fileName); //Load XML from specific file
+	void LoadFromBuffer(std::string buffer); //Load XML from buffer
 	void Reload();	//Reload XML from last used file
 	void Save();	//Save XML to last used file
 	void SaveTo(std::string fileName);	//Save XML to specific file

@@ -8,7 +8,7 @@ int main()
 	PrimeNumbersGenerator gen;	//Creating prime numbers generator
 	try
 	{
-		mgr.LoadFrom("intervals.xml");	//Loading and parsing XML file
+		mgr.LoadFromFile("intervals.xml");	//Loading and parsing XML file
 
 		//Getting content of <intervals> tag (node) 
 		//Do not create tags if they are not exist. In this case it will cause en exeption.
@@ -18,8 +18,8 @@ int main()
 		uint32_t low, high;
 		for (size_t i = 0; i <  xml_intervals->GetNodeCount(); i++)
 		{
-			low = xml_intervals->GetNode("interval", i)->GetNode("low", false)->GetContent<uint32_t>();	//Reading low interval from
-			high = xml_intervals->GetNode("interval", i)->GetNode("high", false)->GetContent<uint32_t>();
+			low = xml_intervals->GetNodeSkipMatches("interval", i)->GetNode("low", false)->GetContent<uint32_t>();	//Reading low interval from
+			high = xml_intervals->GetNodeSkipMatches("interval", i)->GetNode("high", false)->GetContent<uint32_t>();
 			gen.AddInterval(low, high);	//Adding intervals to generator instance
 		}
 

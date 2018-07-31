@@ -12,4 +12,4 @@
 *.ilk
 *.exe
 *.dll
-*.xml
+*.lib
