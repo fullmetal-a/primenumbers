@@ -11,5 +11,6 @@
 *.user
 *.ilk
 *.exe
+*.exp
 *.dll
 *.lib
