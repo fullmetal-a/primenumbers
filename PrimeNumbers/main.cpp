@@ -4,38 +4,41 @@
 
 int main()
 {
-	CXMLMgr mgr;
-	PrimeNumbersGenerator gen;
+	CXMLMgr mgr;	//Creating XML Manager object
+	PrimeNumbersGenerator gen;	//Creating prime numbers generator
 	try
 	{
-		mgr.LoadFrom("intervals.xml");
-		std::vector<std::pair<uint32_t, uint32_t>> intervals;
-		std::vector<uint32_t> primes;
-		std::vector<std::thread> threads;
-		auto xml_intervals = mgr.GetRootNode()->GetNode("root", false)->GetNode("intervals", false);
+		mgr.LoadFrom("intervals.xml");	//Loading and parsing XML file
+
+		//Getting content of <intervals> tag (node) 
+		//Do not create tags if they are not exist. In this case it will cause en exeption.
+		auto xml_intervals = mgr.GetRootNode()->GetNode("root", false)->GetNode("intervals", false);	
+		
+		//Extracting intervals from parsed XML and adding it
 		uint32_t low, high;
 		for (size_t i = 0; i <  xml_intervals->GetNodeCount(); i++)
 		{
-			low = xml_intervals->GetNode("interval", i)->GetNode("low", false)->GetContent<uint32_t>();
+			low = xml_intervals->GetNode("interval", i)->GetNode("low", false)->GetContent<uint32_t>();	//Reading low interval from
 			high = xml_intervals->GetNode("interval", i)->GetNode("high", false)->GetContent<uint32_t>();
-			gen.InsertInterval(low, high);
+			gen.AddInterval(low, high);	//Adding intervals to generator instance
 		}
 
-		if(gen.GetIntervalCount() == 0)
+		if(gen.GetIntervalCount() == 0)	//If we have no intervals - throw an exeption, we cannot continue
 			throw std::runtime_error("No intervals was found in XML file.");
 		
-		gen.Generate();
+		gen.Generate();	//Generating prime numbers
 
-		std::string allPrimeNumbers = gen.GetUniqueGeneratedPrimes();
-		auto primesNode = mgr.GetRootNode()->GetNode("root")->GetNode("primes");
-		primesNode->SetTagName("primes");
-		primesNode->SetContent(allPrimeNumbers);
-		mgr.Save();
+		std::string allPrimeNumbers = gen.GetUniqueGeneratedPrimes();	//Get string row of all numbers (every number is unique)
+
+																		//Get node of <primes> tag. If it exists - returns existing node. If it's not - it will be created.
+		auto primesNode = mgr.GetRootNode()->GetNode("root")->GetNode("primes");	
+		primesNode->SetContent(allPrimeNumbers);	//Write all prime numbers to <primes> tag
+		mgr.Save();	//Save XML file
 		std::cout << "Work has been complete. All numbers are saved in 'intervals.xml' file." << std::endl;
 	}
-	catch (std::runtime_error& err)
+	catch (std::runtime_error& err)	//Handles all exeptions of XML parser and main application
 	{
-		std::cout << err.what() << std::endl;
+		std::cout << err.what() << std::endl;	//Prints error message
 	}
 
 	system("pause");
