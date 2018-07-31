@@ -3,6 +3,7 @@
 #include <vector>
 #include <map>
 #include <sstream>
+#include <stdexcept>
 
 class CXMLMgr
 {
@@ -24,11 +25,11 @@ public:
 		XML_Tree_Node();
 		XML_Tree_Node(XML_Tree_Node* topNode, std::string Name, std::string Value);
 
-		//For std::vector only
 		XML_Tree_Node(const XML_Tree_Node& copy);
 		XML_Tree_Node & operator=(const XML_Tree_Node& copy);
 
 		std::string GetTagName() const;
+		std::string GetContent() const;
 		template<class T> T GetContent() const
 		{
 			std::stringstream ss;
@@ -38,8 +39,10 @@ public:
 			return t;
 		}
 		size_t GetNodeCount() const;
+		bool HasContent() const;
 
 		void SetTagName(std::string tagName);
+		void SetContent(std::string content);
 		template<class T> void SetContent(T content)
 		{
 			std::stringstream ss;
@@ -48,8 +51,11 @@ public:
 		}
 
 		std::string BuildXMLOutput();
-		template<class T = std::string> XML_Tree_Node* InsertNode(std::string tagName = "", T content = "")
+		XML_Tree_Node* InsertNode(std::string tagName, std::string content = "");
+		template<class T> XML_Tree_Node* InsertNode(std::string tagName, T content)
 		{
+			if(tagName.length() == 0)
+				throw std::runtime_error("XML Error: Cannot create a nameless tag.");
 			std::stringstream ss;
 			ss << content;
 			_nodes.push_back(CXMLMgr::XML_Tree_Node(this, tagName, ss.str()));

@@ -1,5 +1,4 @@
 #include "XMLMgr.h"
-#include <stdexcept>
 #include <io.h>
 #include <fstream>
 #include <regex>
@@ -7,30 +6,129 @@
 #include <stack>
 #include <vector>
 
-
-std::string formTag(std::string tagName, bool isClosing)
+namespace XML_Utils
 {
-	std::string retval = "<";
-	if (isClosing)
-		retval += "/";
-	retval += tagName + ">";
-	return retval;
-}
+	std::string formTag(const std::string& tagName, bool isClosing)
+	{
+		std::string retval = "<";
+		if (isClosing)
+			retval += "/";
+		retval += tagName + ">";
+		return retval;
+	}
 
-bool CheckTagName(std::string tagName)
-{
-	std::regex tagName_re("^[A-Za-z0-9_-]+$");
+	bool CheckTagName(const std::string& tagName)
+	{
+		std::regex tagName_re("^[A-Za-z0-9_-]+$");
 
-	if (tagName.length() == 0)
-		return false;
+		if (tagName.length() == 0)
+			return false;
 
-	if (tagName.length() > 1000)
-		return false;
+		if (tagName.length() > 1000)
+			return false;
 
-	if (!std::regex_match(tagName, tagName_re))
-		return false;
-	else
-		return true;
+		if (!std::regex_match(tagName, tagName_re))
+			return false;
+		else
+			return true;
+	}
+
+	void ReplaceCharWithString(std::string& fullstr, size_t i, const std::string& str)
+	{
+		std::string s = fullstr.substr(0, i) + str + fullstr.substr(i + 1, (fullstr.length() - 1) - i);
+		fullstr = s;
+	}
+
+	void ReplaceStringWithChar(std::string& fullstr, size_t i, size_t count, char c)
+	{
+		std::string s = fullstr.substr(0, i);
+		s.push_back(c);
+		s += fullstr.substr(i + count, fullstr.length() - (i + count));
+		fullstr = s;
+	}
+
+	void TransformContent(std::string& content, bool fromXMLText)
+	{
+		std::string newContent;
+		size_t first = 1, pos = 0, pos2 = 0;
+		std::vector<std::pair<char, std::string>> xmlSymbols;
+		xmlSymbols.push_back(std::pair<char, std::string>('>', "&gt;"));
+		xmlSymbols.push_back(std::pair<char, std::string>('<', "&lt;"));
+		xmlSymbols.push_back(std::pair<char, std::string>('&', "&amp;"));
+		xmlSymbols.push_back(std::pair<char, std::string>('\'', "&apos;"));
+		xmlSymbols.push_back(std::pair<char, std::string>('"', "&quot;"));
+
+		if (!fromXMLText)
+		{
+			for (auto it = xmlSymbols.begin(); it != xmlSymbols.end(); it++)
+			{
+				first = 0;
+				pos = 0;
+				pos2 = 0;
+				while (true)
+				{
+					pos = content.find(it->first, pos + 1 - first);
+					pos2 = content.find(it->second, pos + 1 - first);
+					first = 0;
+					if (pos != std::string::npos && pos != pos2)
+						ReplaceCharWithString(content, pos, it->second);
+					else
+						break;
+
+				}
+			}
+		}
+		else
+		{
+			for (auto it = xmlSymbols.begin(); it != xmlSymbols.end(); it++)
+			{
+				first = 0;
+				pos = 0;
+				while (true)
+				{
+					pos = content.find(it->second, pos + 1 - first);
+					first = 0;
+					if (pos != std::string::npos)
+						ReplaceStringWithChar(content, pos, it->second.length(), it->first);
+					else
+						break;
+
+				}
+			}
+		}
+	}
+
+	size_t CountLines(const std::string& s, size_t tillPosition)
+	{
+		size_t count = 0;
+		size_t pos = 0;
+		while (pos < tillPosition)
+		{
+			pos = s.find('\n', pos + 1);
+			count++;         
+		}
+		return count;
+	}
+
+	void RemoveComments(std::string& buffer)
+	{
+		size_t begin, end;
+		std::string tmp;
+
+		while (true)
+		{
+			begin = buffer.find("<!--", 0);
+			if (begin == std::string::npos)
+				break;
+			end = buffer.find("-->", begin);
+			tmp = buffer.substr(0, begin);
+			
+			if(end != std::string::npos)
+				tmp += buffer.substr(end + 3, (buffer.length() - (end + 3)));
+			
+			buffer = tmp;
+		}
+	}
 }
 
 CXMLMgr::XML_Tree_Node::XML_Tree_Node()
@@ -75,7 +173,7 @@ std::string CXMLMgr::XML_Tree_Node::GetTagName() const
 
 void CXMLMgr::XML_Tree_Node::SetTagName(std::string tagName)
 {
-	if(!CheckTagName(tagName))
+	if(!XML_Utils::CheckTagName(tagName))
 		throw std::runtime_error("XML Parsing error: Bad tag name.");
 	_tagName = tagName;
 }
@@ -157,6 +255,8 @@ CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNodeByIndex(size_t i)
 
 CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNode(std::string tagName, size_t skipMatches)
 {
+	if (tagName.length() == 0)
+		throw std::runtime_error("XML Error: Cannot search for nameless tag.");
 	size_t matches = 0;
 	for (auto it = _nodes.begin(); it != _nodes.end(); it++)
 	{
@@ -178,6 +278,8 @@ CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNode(std::string tagName, siz
 
 CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::GetNode(std::string tagName, bool createIfNotExist)
 {
+	if (tagName.length() == 0)
+		throw std::runtime_error("XML Error: Cannot search for nameless tag.");
 	for (auto it = _nodes.begin(); it != _nodes.end(); it++)
 	{
 		if ((*it)._tagName == tagName)
@@ -231,7 +333,7 @@ std::string CXMLMgr::XML_Tree_Node::BuildXMLOutput()
 		return "";
 
 	CXMLMgr::XML_Tree_Node* tmpNode, *node = this;
-	std::string xml;
+	std::string xml, tmpContent;
 	size_t depth = 0;
 	bool first = false;
 
@@ -253,7 +355,7 @@ std::string CXMLMgr::XML_Tree_Node::BuildXMLOutput()
 				depth--;
 				for (size_t i = 0; i < depth; i++)
 					xml += "\t";
-				xml += formTag(node->GetTagName(), true) + "\r\n";
+				xml += XML_Utils::formTag(node->GetTagName(), true) + "\n";
 				node = node->GetTopNode();
 				continue;
 			}
@@ -262,16 +364,18 @@ std::string CXMLMgr::XML_Tree_Node::BuildXMLOutput()
 				for (size_t i = 0; i < depth; i++)
 					xml += "\t";
 				node = tmpNode;
-				xml += formTag(node->GetTagName(), false);
+				xml += XML_Utils::formTag(node->GetTagName(), false);
 				if (node->GetNodeCount() > 0)
-					xml += "\r\n";
+					xml += "\n";
 				depth++;
 			}
 		}
 		else //If it's finish of branch
 		{
-			xml += node->GetContent<std::string>();
-			xml += formTag(node->GetTagName(), true) + "\r\n";
+			tmpContent = node->GetContent();
+			XML_Utils::TransformContent(tmpContent, false);
+			xml += tmpContent;
+			xml += XML_Utils::formTag(node->GetTagName(), true) + "\n";
 			node = node->GetTopNode();
 			depth--;
 		}
@@ -292,6 +396,34 @@ CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::operator[](std::string tagName)
 size_t CXMLMgr::XML_Tree_Node::GetNodeCount() const
 {
 	return _nodes.size();
+}
+
+bool CXMLMgr::XML_Tree_Node::HasContent() const
+{
+	if (_value.length() > 0)
+		return true;
+	else
+		return false;
+}
+
+std::string CXMLMgr::XML_Tree_Node::GetContent() const
+{
+	return _value;
+}
+
+void CXMLMgr::XML_Tree_Node::SetContent(std::string content)
+{
+	_value = content;
+}
+
+CXMLMgr::XML_Tree_Node* CXMLMgr::XML_Tree_Node::InsertNode(std::string tagName, std::string content)
+{
+	if (tagName.length() == 0)
+		throw std::runtime_error("XML Error: Cannot create a nameless tag.");
+	_nodes.push_back(CXMLMgr::XML_Tree_Node(this, tagName, content));
+	_it = _nodes.begin();
+	_UpdateTopNodes();
+	return GetLastNode();
 }
 
 CXMLMgr::CXMLMgr() :
@@ -325,13 +457,14 @@ void CXMLMgr::ParseFile()
 	fileContent.assign((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
 	f.close();
 
-	
+	XML_Utils::RemoveComments(fileContent);
 	std::string tagName, content;
 	std::stack<std::pair<std::string, size_t>> openedTags;
-	size_t dest = 0, offset = 0, tempOffset = 0, contentLength = 0;
+	size_t dest = 0, offset = 0, tempOffset = 0, contentLength = 0, comment = 0;
 	size_t fileLen = fileContent.length();
 	bool closingTag = false;
 	CXMLMgr::XML_Tree_Node* node = &m_TreeRoot; 
+
 
 	while(true)
 	{
@@ -343,7 +476,10 @@ void CXMLMgr::ParseFile()
 			if (openedTags.size() > 0)
 			{
 				m_fileName = "";
-				throw std::runtime_error("XML Parsing error: Reached end of the file, but some tags isn't closed.");
+				char errmsg[1200];
+				size_t line = XML_Utils::CountLines(fileContent, openedTags.top().second);
+				sprintf_s(errmsg, 1200, "XML Parsing error: Reached end of the file, but tag \"%s\"on line %u.", openedTags.top().first.c_str(), line);
+				throw std::runtime_error(errmsg);
 			}
 			break;
 		}
@@ -361,35 +497,50 @@ void CXMLMgr::ParseFile()
 			if (dest == std::string::npos)
 			{
 				m_fileName = "";
-				throw std::runtime_error("XML Parsing error: Endless tag found.");
+				char errmsg[1200];
+				size_t line = XML_Utils::CountLines(fileContent, offset);
+				sprintf_s(errmsg, 1200, "XML Parsing error: Endless tag found on line %u.", line);
+				throw std::runtime_error(errmsg);
 			}
 
 			tagName = fileContent.substr(offset + 1, dest - (offset + 1));
 			if (tagName.length() == 0)
 			{
 				m_fileName = "";
-				throw std::runtime_error("XML Parsing error: Nameless tag found.");
+				char errmsg[1200];
+				size_t line = XML_Utils::CountLines(fileContent, offset);
+				sprintf_s(errmsg, 1200, "XML Parsing error: Nameless tag found on line %u.", line);
+				throw std::runtime_error(errmsg);
 			}
 
 			if(tagName.length() > 1000)
 			{
 				m_fileName = "";
-				throw std::runtime_error("XML Parsing error: Too long tag name.");
+				char errmsg[1200];
+				size_t line = XML_Utils::CountLines(fileContent, offset);
+				sprintf_s(errmsg, 1200, "XML Parsing error: Too long tag name on line %u.", line);
+				throw std::runtime_error(errmsg);
 			}
 
-			if (!CheckTagName(tagName))
+			if (!XML_Utils::CheckTagName(tagName))
 			{
-				fileContent = ""; m_fileName = "";
-				throw std::runtime_error("XML Parsing error: Bad tag name.");
+				m_fileName = "";
+				char errmsg[1200];
+				size_t line = XML_Utils::CountLines(fileContent, offset);
+				sprintf_s(errmsg, 1200, "XML Parsing error: Bad tag name \"%s\" on line %u.", tagName.c_str(), line);
+				throw std::runtime_error(errmsg);
 			}
 
 			if (closingTag)
 			{
 				if (tagName == openedTags.top().first)
 				{
-					contentLength = offset - openedTags.top().second;
+					contentLength = offset - openedTags.top().second - 1;
 					content = fileContent.substr(openedTags.top().second, contentLength);
+					XML_Utils::TransformContent(content, true);
 					node->SetContent(content);
+					if (node->GetTopNode())
+						node->GetTopNode()->SetContent("");
 					node = node->GetTopNode();
 					openedTags.pop();
 				}
@@ -397,12 +548,13 @@ void CXMLMgr::ParseFile()
 				else
 				{
 					m_fileName = "";
-					throw std::runtime_error(std::string(std::string("XML Parsing error: Unexpected closing tag \"</") + tagName + ">\", expected: \"</" + openedTags.top().first + ">\"").c_str());
+					size_t line = XML_Utils::CountLines(fileContent, offset);
+					throw std::runtime_error(std::string(std::string("XML Parsing error: Unexpected closing tag \"</") + tagName + ">\" on line " + std::to_string(line) +  ", expected: \"</" + openedTags.top().first + ">\"").c_str());
 				}
 			}
 			else
 			{
-				openedTags.push(std::pair<std::string, size_t>(tagName, dest));
+				openedTags.push(std::pair<std::string, size_t>(tagName, dest + 1));
 				node = node->InsertNode(tagName);
 			}
 
